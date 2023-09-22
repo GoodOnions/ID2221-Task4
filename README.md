@@ -3,6 +3,6 @@
 
 
 ## Start CassandraCluster
-"""
+```
  docker compose -f CassandraCluster/compose.yml up -d
-"""
+```
