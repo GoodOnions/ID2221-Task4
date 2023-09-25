@@ -1,2 +1,125 @@
-services:
+version: '3'
+networks:
+    goodonions:
+        driver: bridge
+        ipam:
+            driver: default
+            config:
+                - subnet: "10.0.0.0/24"
+
+services:  
+
+
+  spark_master:
+    image: 'bitnami/spark:latest'
+    container_name: spark_master
+    hostname: spark_master
+    user: root
+    environment:
+      - SPARK_MODE=master
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no      
+    volumes:
+      - './spark/master/spark_data:/bitnami'
+    networks:
+      goodonions:
+        ipv4_address: 10.0.0.2
+
+  spark-worker:
+    image: 'bitnami/spark:latest'
+    container_name: spark_worker
+    hostname: spark_worker
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=10.0.0.2:7077
+      - SPARK_WORKER_MEMORY=1G
+      - SPARK_WORKER_CORES=1
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+    depends_on:
+      - spark_master
+    networks:
+      goodonions:
+        ipv4_address: 10.0.0.3
+
+
+  zookeeper:
+    image: 'bitnami/zookeeper:latest'
+    container_name: zookeeper
+    hostname: zookeeper
+    ports:
+      - '2181:2181'
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+      - ZOO_CLIENT_USER=goodonions
+      - ZOO_CLIENT_PASSWORD=d87d77b80d5e043ef66a69c7c6b46797
+    networks:
+      goodonions:
+        ipv4_address: 10.0.0.4
+
+  kafka:
+    image: 'bitnami/kafka:latest'
+    container_name: kafka
+    hostname: kafka
+    ports:
+      - '9094:9094'
+    environment: 
+    - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
+    - KAFKA_LISTENERS=INTERNAL://:9093,EXTERNAL://:9094
+    - KAFKA_ADVERTISED_LISTENERS=INTERNAL://kafka:9093,EXTERNAL://localhost:9094
+    - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=INTERNAL:SSL,EXTERNAL:PLAINTEXT
+    - KAFKA_INTER_BROKER_LISTENER_NAME=INTERNAL
+    - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
+    - KAFKA_CFG_CONFLUENT_SUPPORT_METRICS_ENABLE=false
+    - KAFKA_CFG_DELETE_TOPIC_ENABLE=true
+    - KAFKA_AUTO_CREATE_TOPICS_ENABLE=true
+    - KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM=
+    #- KAFKA_OPTS=-Djava.security.auth.login.config=/opt/bitnami/kafka/conf/sasl-jaas.config
+    - KAFKA_CFG_LISTENER_NAME_INTERNAL_SSL_KEYSTORE_PASSWORD=d87d77b80d5e043ef66a69c7c6b46797
+    - KAFKA_CERTIFICATE_PASSWORD=d87d77b80d5e043ef66a69c7c6b46797
+    - KAFKA_CFG_LISTENER_NAME_INTERNAL_SSL_KEYSTORE_LOCATION=/bitnami/kafka/config/certs/kafka.keystore.jks
+    - KAFKA_CFG_LISTENER_NAME_INTERNAL_SSL_TRUSTSTORE_LOCATION=/bitnami/kafka/config/certs/kafka.truststore.jks
+    - KAFKA_CFG_LISTENER_NAME_INTERNAL_SSL_TRUSTSTORE_PASSWORD=d87d77b80d5e043ef66a69c7c6b46797
+    - KAFKA_ZOOKEEPER_USER=goodonions
+    - KAFKA_ZOOKEEPER_PASSWORD=d87d77b80d5e043ef66a69c7c6b46797
+    - KAFKA_KRAFT_CLUSTER_ID = 01062000
+
+    - KAFKA_CREATE_TOPICS= 'message:1:1'
+      
+
+    depends_on:
+      - zookeeper
+    volumes:
+      #- ./kafka/data:/bitnami/kafka
+      - ./kafka/certs:/bitnami/kafka/config/certs
+    networks:
+      goodonions:
+        ipv4_address: 10.0.0.5
+        
+
+  cassandra1:
+    image: 'bitnami/cassandra:latest'
+    container_name: cassandra1
+    hostname: cassandra1
+    mem_limit: 2g
+    ports:
+      - '9042:9042'
+    environment: &environment    # Declare and save environments variables into "environment"
+      CASSANDRA_CLUSTER_NAME: GoodOnions
+      CASSANDRA_ENDPOINT_SNITCH: GossipingPropertyFileSnitch
+      CASSANDRA_NUM_TOKENS: 128
+
+      CASSANDRA_USER: goodonions
+      CASSANDRA_PASSWORD: d87d77b80d5e043ef66a69c7c6b46797
+    
+    volumes:
+      - ./cassandra/cass1:/home
+    networks:
+      goodonions:
+        ipv4_address: 10.0.0.6
+
   
