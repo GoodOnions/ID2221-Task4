@@ -1,3 +1,4 @@
 dataBD/
 dataKK/
-.json
+*.json
+cassandra/*
