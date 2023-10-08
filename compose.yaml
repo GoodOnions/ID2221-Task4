@@ -102,7 +102,7 @@ services:
       ports:
         - '9042:9042'      
       volumes:
-        - ./cassandra/cass:/home
+        - ./cassandra/cass1:/bitnami/cassandra
       networks:
         goodonions:
           ipv4_address: 10.0.0.6

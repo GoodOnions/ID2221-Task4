@@ -22,13 +22,18 @@ item_schema = StructType([
 
 
 packages = [
-    'org.apache.spark:spark-sql-kafka-0-10_2.12:3.1.2'
+    'org.apache.spark:spark-sql-kafka-0-10_2.12:3.1.2',
+    'org.apache.spark:spark-sql-connector-cassandra_2.12:3.1.2'
 ]
 
 spark = SparkSession.builder\
    .master("spark://10.0.0.2:7077")\
    .appName("Demo")\
    .config("spark.jars.packages", ",".join(packages))\
+   .config("spark.cassandra.connection.host", "10.0.0.6")\
+   .config("spark.cassandra.connection.port", "9042")\
+   .config("spark.cassandra.auth.username","cassandra")\
+   .config("spark.cassandra.auth.password","cassandra")\
    .getOrCreate() 
 
 spark.sparkContext.setLogLevel("WARN")
@@ -37,7 +42,7 @@ df = spark\
         .readStream\
         .format("kafka")\
         .option("kafka.bootstrap.servers", "10.0.0.5:9094")\
-        .option("subscribe", "test")\
+        .option("subscribe", "onions")\
         .option("startingOffsets", "earliest")\
         .load()
 
@@ -61,16 +66,20 @@ query = json_df.selectExpr("CAST(user_id AS STRING)",\
     .writeStream \
     .format("console") \
     .start()
+# query.awaitTermination()
 
-query.awaitTermination()
 
-# df.show()
+def writeToCassandra(writeDF, _):
+  writeDF.write \
+    .format("org.apache.spark.sql.cassandra")\
+    .mode('append')\
+    .options(table="music_play_history", keyspace="goodonions")\
+    .save()
 
-# df.selectExpr("CAST(id AS STRING) AS key", "to_json(struct(*)) AS value")\
-#    .writeStream\
-#    .format("kafka")\
-#    .outputMode("append")\
-#    .option("kafka.bootstrap.servers", "192.168.1.100:9092")\
-#    .option("topic", "test_2")\
-#    .start()\
-#    .awaitTermination()
+json_df.writeStream \
+    .foreachBatch(writeToCassandra) \
+    .outputMode("update") \
+    .start()\
+    .awaitTermination()
+
+json_df.show()

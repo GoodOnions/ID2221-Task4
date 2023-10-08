@@ -1,4 +1,5 @@
 dataBD/
 dataKK/
 *.json
-cassandra/*
+goodonions/
+commitlog/
