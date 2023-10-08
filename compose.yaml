@@ -86,7 +86,7 @@ services:
     - KAFKA_CFG_DELETE_TOPIC_ENABLE=true
     - KAFKA_AUTO_CREATE_TOPICS_ENABLE=true
     
-    #- KAFKA_CREATE_TOPICS= 'message:2:2'
+    - KAFKA_CREATE_TOPICS= 'onions:1:1'
     depends_on:
       - zookeeper
     #volumes:

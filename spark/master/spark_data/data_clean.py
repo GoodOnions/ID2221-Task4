@@ -55,14 +55,16 @@ json_df = json_df.select('*',explode(from_json(col("items").cast("string"), Arra
 json_df = json_df.select('user_id','played_at',\
                          get_json_object(col("track").cast("string"), "$.id").alias("track_id"),\
                          get_json_object(col("track").cast("string"), "$.name").alias("track_name"),\
-                         get_json_object(col("context").cast("string"), "$.type").alias("context_type"),)
+                         get_json_object(col("context").cast("string"), "$.type").alias("context_type"),\
+                         get_json_object(col("context").cast("string"), "$.href").alias("context_href"),)
 
 
 query = json_df.selectExpr("CAST(user_id AS STRING)",\
                            "CAST(played_at AS STRING)",\
                            "CAST(track_id AS STRING)",\
                            "CAST(track_name AS STRING)",\
-                           "CAST(context_type AS STRING)")\
+                           "CAST(context_type AS STRING)",\
+                           "CAST(context_href AS STRING)")\
     .writeStream \
     .format("console") \
     .start()
