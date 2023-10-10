@@ -106,3 +106,13 @@ services:
       networks:
         goodonions:
           ipv4_address: 10.0.0.6
+
+  redis:
+    image: 'redis'
+    container_name: redis
+    hostname: redis
+    ports:
+      - '6379:6379'
+    networks:
+        goodonions:
+          ipv4_address: 10.0.0.7

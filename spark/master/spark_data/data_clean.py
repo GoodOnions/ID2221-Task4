@@ -1,9 +1,19 @@
+import os
+
+
+os.system("pip install pandas requests PyArrow")
+
+
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import explode
 from pyspark.sql import SparkSession
 import json
-from pyspark.sql.functions import from_json, col, get_json_object
+import pandas as pd
+from pyspark.sql.functions import from_json, col, get_json_object, pandas_udf, udf
 from pyspark.sql.types import StructType, StructField, StringType, IntegerType, TimestampType, ArrayType
+import requests
+
+
 
 # Define the schema, replace with what you expect
 response_schema = StructType([
@@ -53,10 +63,46 @@ json_df = df.select(explode(from_json(col("value").cast("string"), ArrayType(res
 json_df = json_df.select('*',explode(from_json(col("items").cast("string"), ArrayType(item_schema))).alias('item')).select('*','item.*')
 
 json_df = json_df.select('user_id','played_at',\
-                         get_json_object(col("track").cast("string"), "$.id").alias("track_id"),\
-                         get_json_object(col("track").cast("string"), "$.name").alias("track_name"),\
-                         get_json_object(col("context").cast("string"), "$.type").alias("context_type"),\
-                         get_json_object(col("context").cast("string"), "$.href").alias("context_href"),)
+                         get_json_object(col("track").cast("string"), "$.id").alias("track_id").cast('string'),\
+                         get_json_object(col("track").cast("string"), "$.name").alias("track_name").cast('string'),\
+                         get_json_object(col("context").cast("string"), "$.type").alias("context_type").cast('string'),\
+                         get_json_object(col("context").cast("string"), "$.href").alias("context_href").cast('string'),)
+
+
+def requestAPI(track_id):
+    AUTH_URL = 'https://accounts.spotify.com/api/token'
+
+    # POST
+    auth_response = requests.post(AUTH_URL, {
+        'grant_type': 'client_credentials',
+        'client_id': '72c2183e4c034c15a0305818667390b7',
+        'client_secret': '7dc6919a592f49519435f7dc3f8fc1b5',
+    })
+
+    # convert the response to JSON
+    auth_response_data = auth_response.json()
+
+    # save the access token
+    access_token= auth_response_data['access_token']
+
+    headers = {
+        'Authorization': 'Bearer {token}'.format(token=access_token)
+    }
+
+    BASE_URL = 'https://api.spotify.com/v1/'
+
+    # actual GET request with proper header
+    r = requests.get(BASE_URL + 'audio-features/' + track_id, headers=headers)
+
+    return (r.json()['energy'],r.json()['danceability'],r.json()['duration_ms'])
+
+get_track_info_udf = udf(requestAPI, returnType = StructType([
+                                            StructField("energy", StringType(), True),
+                                            StructField("danceability", StringType(), True),
+                                            StructField("duration_ms", StringType(), True)
+                                        ]))
+
+json_df = json_df.withColumn("features", get_track_info_udf(json_df['track_id']))
 
 
 query = json_df.selectExpr("CAST(user_id AS STRING)",\
@@ -64,6 +110,7 @@ query = json_df.selectExpr("CAST(user_id AS STRING)",\
                            "CAST(track_id AS STRING)",\
                            "CAST(track_name AS STRING)",\
                            "CAST(context_type AS STRING)",\
+                           "CAST(features AS STRING)",\
                            "CAST(context_href AS STRING)")\
     .writeStream \
     .format("console") \
@@ -83,5 +130,6 @@ json_df.writeStream \
     .outputMode("update") \
     .start()\
     .awaitTermination()
+
 
 json_df.show()
