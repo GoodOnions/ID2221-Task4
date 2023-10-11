@@ -54,7 +54,6 @@ services:
       goodonions:
         ipv4_address: 10.0.0.3
 
-
   zookeeper:
     image: 'bitnami/zookeeper:latest'
     container_name: zookeeper
@@ -85,8 +84,6 @@ services:
     - KAFKA_CFG_CONFLUENT_SUPPORT_METRICS_ENABLE=false
     - KAFKA_CFG_DELETE_TOPIC_ENABLE=true
     - KAFKA_AUTO_CREATE_TOPICS_ENABLE=true
-    
-    - KAFKA_CREATE_TOPICS= 'onions:1:1'
     depends_on:
       - zookeeper
     #volumes:
@@ -103,6 +100,7 @@ services:
         - '9042:9042'      
       volumes:
         - ./cassandra/cass1:/bitnami/cassandra
+        - ./cassandra/schema:/schema
       networks:
         goodonions:
           ipv4_address: 10.0.0.6
