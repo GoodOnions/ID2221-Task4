@@ -1,8 +1,3 @@
-import os
-
-
-os.system("pip install pandas requests PyArrow")
-
 from time import sleep
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import explode
@@ -11,7 +6,7 @@ import json
 import pandas as pd
 from pyspark.sql.functions import from_json, col, get_json_object, udf, pandas_udf
 from pyspark.sql import functions as F
-from pyspark.sql.types import StructType, StructField, StringType, IntegerType, TimestampType, ArrayType, DoubleType, FloatType
+from pyspark.sql.types import StructType, StructField, StringType, IntegerType, TimestampType, ArrayType, DoubleType
 import requests
 
 
@@ -105,7 +100,7 @@ json_df = json_df.select('*',explode(from_json(col("items").cast("string"), Arra
 json_df = json_df.select('user_id','played_at',\
                          get_json_object(col("track").cast("string"), "$.id").alias("track_id").cast('string'),\
                          get_json_object(col("track").cast("string"), "$.name").alias("track_name").cast('string'),\
-                         get_json_object(col("track").cast("string"), "$.popularity").alias("track_popularity").cast('string'),\
+                         get_json_object(col("track").cast("string"), "$.popularity").alias("track_popularity").cast('double'),\
                          get_json_object(col("context").cast("string"), "$.type").alias("context_type").cast('string'),\
                          get_json_object(col("context").cast("string"), "$.href").alias("context_href").cast('string'),)
 
@@ -115,11 +110,11 @@ json_df = json_df.select('user_id','played_at',\
 get_track_info_udf = pandas_udf(requestAPI, returnType = StructType([
                                                             StructField("energy", DoubleType(), True),
                                                             StructField("danceability", DoubleType(), True),
+                                                            StructField("duration_ms", DoubleType(), True),
                                                             StructField("instrumentalness", DoubleType(), True),
                                                             StructField("loudness", DoubleType(), True),
                                                             StructField("tempo", DoubleType(), True),
-                                                            StructField("valence", DoubleType(), True),
-                                                            StructField("duration_ms", DoubleType(), True)
+                                                            StructField("valence", DoubleType(), True)
                                                             ]))
 
 
