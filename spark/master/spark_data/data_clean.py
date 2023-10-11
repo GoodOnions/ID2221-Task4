@@ -3,14 +3,15 @@ import os
 
 os.system("pip install pandas requests PyArrow")
 
-
+from time import sleep
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import explode
 from pyspark.sql import SparkSession
 import json
 import pandas as pd
-from pyspark.sql.functions import from_json, col, get_json_object, pandas_udf, udf
-from pyspark.sql.types import StructType, StructField, StringType, IntegerType, TimestampType, ArrayType
+from pyspark.sql.functions import from_json, col, get_json_object, udf, pandas_udf
+from pyspark.sql import functions as F
+from pyspark.sql.types import StructType, StructField, StringType, IntegerType, TimestampType, ArrayType, DoubleType, FloatType
 import requests
 
 
@@ -28,6 +29,45 @@ item_schema = StructType([
     StructField("played_at", StringType(),True),
     StructField("context", StringType(),True)
 ])
+
+def requestAPI(track_ids):
+    AUTH_URL = 'https://accounts.spotify.com/api/token'
+
+    # POST
+    auth_response = requests.post(AUTH_URL, {
+        'grant_type': 'client_credentials',
+        'client_id': '72c2183e4c034c15a0305818667390b7',
+        'client_secret': '7dc6919a592f49519435f7dc3f8fc1b5',
+    })
+
+    # convert the response to JSON
+    auth_response_data = auth_response.json()
+
+    # save the access token
+    access_token= auth_response_data['access_token']
+
+    headers = {
+        'Authorization': 'Bearer {token}'.format(token=access_token)
+    }
+
+    BASE_URL = 'https://api.spotify.com/v1/'
+
+    track_ids_str = ','.join(track_ids)
+    # actual GET request with proper header
+    r = requests.get(BASE_URL + 'audio-features?ids=' + track_ids_str, headers=headers)
+
+    while r.status_code!=200:
+        print('Status code ->',r.status_code)
+        sleep(20)
+        r = requests.get(BASE_URL + 'audio-features?ids=' + track_ids_str, headers=headers)
+
+    r = r.json()
+    result = []
+    for track in r['audio_features']:
+        
+        result.append((track['energy'], track['danceability'], track['duration_ms'], track['instrumentalness'],\
+                       track['loudness'], track['tempo'], track['valence']))
+    return pd.DataFrame(result)
 
 
 
@@ -65,53 +105,42 @@ json_df = json_df.select('*',explode(from_json(col("items").cast("string"), Arra
 json_df = json_df.select('user_id','played_at',\
                          get_json_object(col("track").cast("string"), "$.id").alias("track_id").cast('string'),\
                          get_json_object(col("track").cast("string"), "$.name").alias("track_name").cast('string'),\
+                         get_json_object(col("track").cast("string"), "$.popularity").alias("track_popularity").cast('string'),\
                          get_json_object(col("context").cast("string"), "$.type").alias("context_type").cast('string'),\
                          get_json_object(col("context").cast("string"), "$.href").alias("context_href").cast('string'),)
 
 
-def requestAPI(track_id):
-    AUTH_URL = 'https://accounts.spotify.com/api/token'
 
-    # POST
-    auth_response = requests.post(AUTH_URL, {
-        'grant_type': 'client_credentials',
-        'client_id': '72c2183e4c034c15a0305818667390b7',
-        'client_secret': '7dc6919a592f49519435f7dc3f8fc1b5',
-    })
 
-    # convert the response to JSON
-    auth_response_data = auth_response.json()
+get_track_info_udf = pandas_udf(requestAPI, returnType = StructType([
+                                                            StructField("energy", DoubleType(), True),
+                                                            StructField("danceability", DoubleType(), True),
+                                                            StructField("instrumentalness", DoubleType(), True),
+                                                            StructField("loudness", DoubleType(), True),
+                                                            StructField("tempo", DoubleType(), True),
+                                                            StructField("valence", DoubleType(), True),
+                                                            StructField("duration_ms", DoubleType(), True)
+                                                            ]))
 
-    # save the access token
-    access_token= auth_response_data['access_token']
-
-    headers = {
-        'Authorization': 'Bearer {token}'.format(token=access_token)
-    }
-
-    BASE_URL = 'https://api.spotify.com/v1/'
-
-    # actual GET request with proper header
-    r = requests.get(BASE_URL + 'audio-features/' + track_id, headers=headers)
-
-    return (r.json()['energy'],r.json()['danceability'],r.json()['duration_ms'])
-
-get_track_info_udf = udf(requestAPI, returnType = StructType([
-                                            StructField("energy", StringType(), True),
-                                            StructField("danceability", StringType(), True),
-                                            StructField("duration_ms", StringType(), True)
-                                        ]))
 
 json_df = json_df.withColumn("features", get_track_info_udf(json_df['track_id']))
+
+json_df = json_df.select('*','features.*').drop('features')
 
 
 query = json_df.selectExpr("CAST(user_id AS STRING)",\
                            "CAST(played_at AS STRING)",\
                            "CAST(track_id AS STRING)",\
                            "CAST(track_name AS STRING)",\
+                           "CAST(track_popularity AS DOUBLE)",\
                            "CAST(context_type AS STRING)",\
-                           "CAST(features AS STRING)",\
-                           "CAST(context_href AS STRING)")\
+                           "CAST(energy AS STRING)",\
+                           "CAST(danceability AS STRING)",\
+                           "CAST(instrumentalness AS STRING)",\
+                           "CAST(loudness AS STRING)",\
+                           "CAST(tempo AS STRING)",\
+                           "CAST(valence AS STRING)",\
+                           "CAST(duration_ms AS STRING)")\
     .writeStream \
     .format("console") \
     .start()
