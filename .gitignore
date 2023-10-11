@@ -3,3 +3,4 @@ dataKK/
 *.json
 goodonions/
 commitlog/
+cassandra/cass1/*
