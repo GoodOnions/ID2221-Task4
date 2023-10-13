@@ -4,3 +4,5 @@ dataKK/
 goodonions/
 commitlog/
 cassandra/cass1/*
+scripts/DataSet/*
+.DS_Store
