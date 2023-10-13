@@ -4,3 +4,4 @@ dataKK/
 goodonions/
 commitlog/
 cassandra/cass1/*
+__pycache__
