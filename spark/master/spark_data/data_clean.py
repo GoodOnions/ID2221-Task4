@@ -1,6 +1,6 @@
 from time import sleep
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import explode
+from pyspark.sql.functions import explode, date_format
 from pyspark.sql import SparkSession
 import pandas as pd
 from pyspark.sql.functions import from_json, col, get_json_object, udf, pandas_udf
@@ -62,6 +62,8 @@ json_df = json_df.select('user_id','played_at',\
                          get_json_object(col("context").cast("string"), "$.type").alias("context_type").cast('string'),\
                          get_json_object(col("context").cast("string"), "$.href").alias("context_href").cast('string'),)
 
+json_df = json_df.withColumn("day_of_week", date_format(col("played_at"), "F"))
+json_df = json_df.withColumn("hour_of_day", date_format(col("played_at"), "H"))
 
 
 
@@ -90,7 +92,10 @@ query = json_df.selectExpr("CAST(user_id AS STRING)",\
                            "CAST(danceability AS STRING)",\
                            "CAST(loudness AS STRING)",\
                            "CAST(tempo AS STRING)",\
-                           "CAST(valence AS STRING)")\
+                           "CAST(valence AS STRING)",\
+                           "CAST(duration_ms AS STRING)",\
+                           "CAST(day_of_week AS INT)",\
+                           "CAST(hour_of_day AS INT)")\
     .writeStream \
     .format("console") \
     .start()
