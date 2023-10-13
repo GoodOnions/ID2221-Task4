@@ -67,11 +67,10 @@ def getTracksAudioFeatures(ids,features):
         r = r.json()
         
         for track in r['audio_features']:
-            
-            request_result[track['id']] = (track['energy'], track['danceability'], track['duration_ms'], track['instrumentalness'],\
+            if(track != None):
+                request_result[track['id']] = (track['energy'], track['danceability'], track['duration_ms'], track['instrumentalness'],\
                                            track['loudness'], track['tempo'], track['valence'])
-            
-            redis_cache.set(track['id'],json.dumps(request_result[track['id']]))
+                redis_cache.set(track['id'],json.dumps(request_result[track['id']]))
 
     return request_result
 
@@ -97,8 +96,8 @@ def getTracksFeaturesAPI(track_ids, features=['energy','danceability','duration_
     for id in track_ids:
 
         if id in missing_ids:
-            result.append(request_result[id])
+            result.append(request_result.get(id,()))
         else:
-            result.append(hitted_ids[id])
+            result.append(hitted_ids.get(id,()))
         
     return pd.DataFrame(result)

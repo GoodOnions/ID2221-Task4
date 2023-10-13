@@ -4,5 +4,6 @@ dataKK/
 goodonions/
 commitlog/
 cassandra/cass1/*
+__pycache__
 scripts/DataSet/*
 .DS_Store
