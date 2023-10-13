@@ -112,10 +112,10 @@ services:
     hostname: redis
     ports:
       - '6379:6379'
-    deploy:
-      resources:
-        limits:
-          memory: 1G
+    # deploy:
+    #   resources:
+    #     limits:
+    #       memory: 1G
     networks:
         goodonions:
           ipv4_address: 10.0.0.7
