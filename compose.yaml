@@ -70,6 +70,7 @@ services:
   kafka:
     image: 'bitnami/kafka:latest'
     container_name: kafka
+    restart: always
     hostname: kafka
     ports:
       - '9093:9093'
@@ -111,6 +112,10 @@ services:
     hostname: redis
     ports:
       - '6379:6379'
+    deploy:
+      resources:
+        limits:
+          memory: 1G
     networks:
         goodonions:
           ipv4_address: 10.0.0.7
