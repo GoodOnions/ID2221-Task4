@@ -62,7 +62,7 @@ json_df = json_df.select('user_id','played_at',\
                          get_json_object(col("context").cast("string"), "$.type").alias("context_type").cast('string'),\
                          get_json_object(col("context").cast("string"), "$.href").alias("context_href").cast('string'),)
 
-json_df = json_df.withColumn("day_of_week", date_format(col("played_at"), "H"))
+json_df = json_df.withColumn("day_of_week", date_format(col("played_at"), "F"))
 json_df = json_df.withColumn("hour_of_day", date_format(col("played_at"), "H"))
 
 
