@@ -11,8 +11,8 @@ docker-compose exec cassandra cqlsh -u cassandra -p cassandra --file /schema/cre
 echo "Cassandra setup completed!"
 
 echo "Installation of dependencies spark worker: "
-docker exec spark_master pip install pandas requests PyArrow &
-docker exec spark_worker pip install pandas requests PyArrow 
+docker exec spark_master pip install pandas requests PyArrow redis
+docker exec spark_worker pip install pandas requests PyArrow redis
 echo "Installation complited!"
 
 
