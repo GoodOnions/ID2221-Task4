@@ -4,7 +4,7 @@ from pyspark.sql.functions import explode, date_format
 from pyspark.sql import SparkSession
 import pandas as pd
 from pyspark.sql.functions import from_json, col, get_json_object, udf, pandas_udf, coalesce
-from pyspark.sql.types import StructType, StructField, StringType, IntegerType, TimestampType, ArrayType, DoubleType
+from pyspark.sql.types import StructType, StructField, StringType, IntegerType, TimestampType, ArrayType, DoubleType, BooleanType
 import requests
 from spotifyAPI import getTracksFeaturesAPI
 import redisCache as rc
@@ -43,6 +43,9 @@ features_schema =StructType([
                     StructField("valence", DoubleType(), True)
                 ])
 
+boolean_schema=StructType([
+                    StructField("isInCache", BooleanType(), True)
+                ])
 
 packages = [
     'org.apache.spark:spark-sql-kafka-0-10_2.12:3.1.2',
@@ -90,16 +93,20 @@ json_df = json_df.withColumn("hour_of_day", date_format(col("played_at"), "H"))
 
 # Definition of udf functions
 get_track_features_cache  = pandas_udf(rc.getTracksFeaturesCache, returnType = features_schema)
+get_track_in_cache  = pandas_udf(rc.isInCacheList, returnType = boolean_schema)
 get_track_features_api = pandas_udf(getTracksFeaturesAPI, returnType = features_schema)
 
+# Map items in cache
+allIDs = json_df.select('track_id').withColumn('isInCache',get_track_in_cache(json_df['track_id'])).select('track_id', 'isInCache.*')
+
 #Get cached items
-inCacheIDs = json_df.filter(col('track_id').isin(list(rc.getKeys()))).select('track_id')
-inCacheTracksFeatures = inCacheIDs.withColumn("features", get_track_features_cache(json_df['track_id']))
+ids = allIDs.filter('isInCache == True').select('track_id')
+inCacheTracksFeatures = ids.withColumn("features", get_track_features_cache(ids['track_id']))
                                   
 
 #Call to API
-missedIDs = json_df.filter(col('track_id').isin(list(rc.getKeys()))==False).select('track_id')
-responseTracksFeatures = missedIDs.withColumn("features", get_track_features_cache(json_df['track_id']))
+ids = allIDs.filter('isInCache == False').select('track_id')
+responseTracksFeatures = ids.withColumn("features", get_track_features_api(ids['track_id']))
 
 #### ToDo: Add items to the cache
 
@@ -126,21 +133,21 @@ query = json_df.selectExpr("CAST(user_id AS STRING)",\
     .writeStream \
     .format("console") \
     .start()
-# query.awaitTermination()
+query.awaitTermination()
 
 
-def writeToCassandra(writeDF, _):
-  writeDF.write \
-    .format("org.apache.spark.sql.cassandra")\
-    .mode('append')\
-    .options(table="music_play_history", keyspace="goodonions")\
-    .save()
+# def writeToCassandra(writeDF, _):
+#   writeDF.write \
+#     .format("org.apache.spark.sql.cassandra")\
+#     .mode('append')\
+#     .options(table="music_play_history", keyspace="goodonions")\
+#     .save()
 
-json_df.writeStream \
-    .foreachBatch(writeToCassandra)\
-    .outputMode("append")\
-    .start()\
-    .awaitTermination()
+# json_df.writeStream \
+#     .foreachBatch(writeToCassandra)\
+#     .outputMode("append")\
+#     .start()\
+#     .awaitTermination()
 
 
 json_df.show()

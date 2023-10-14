@@ -17,15 +17,22 @@ def getKeys():
     return redis_cache.keys()
 
     
+def isInCacheList(tracksIDs):
+
+    keys = set(getKeys())
+    resp=[]
+    for id in tracksIDs:
+        resp.append(id in keys)
+
+    return pd.DataFrame(resp)
+
+
+    
 
 
 def getTracksFeaturesCache(tracksIDs):
 
     response = []
-<<<<<<< HEAD
-=======
-
->>>>>>> Version_with_join
     for id in tracksIDs:
         features = redis_cache.get(id)
         if features == None:
@@ -33,8 +40,4 @@ def getTracksFeaturesCache(tracksIDs):
         else:
             response.append(json.loads(features))
 
-<<<<<<< HEAD
     return pd.DataFrame(response)
-=======
-    return response            
->>>>>>> Version_with_join
