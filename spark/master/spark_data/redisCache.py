@@ -22,6 +22,10 @@ def getKeys():
 def getTracksFeaturesCache(tracksIDs):
 
     response = []
+<<<<<<< HEAD
+=======
+
+>>>>>>> Version_with_join
     for id in tracksIDs:
         features = redis_cache.get(id)
         if features == None:
@@ -29,4 +33,8 @@ def getTracksFeaturesCache(tracksIDs):
         else:
             response.append(json.loads(features))
 
+<<<<<<< HEAD
     return pd.DataFrame(response)
+=======
+    return response            
+>>>>>>> Version_with_join
