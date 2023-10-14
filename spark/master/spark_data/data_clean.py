@@ -137,8 +137,8 @@ def writeToCassandra(writeDF, _):
     .save()
 
 json_df.writeStream \
-    .foreachBatch(writeToCassandra) \
-    .outputMode("update") \
+    .foreachBatch(writeToCassandra)\
+    .outputMode("append")\
     .start()\
     .awaitTermination()
 

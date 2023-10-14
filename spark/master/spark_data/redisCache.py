@@ -22,7 +22,6 @@ def getKeys():
 def getTracksFeaturesCache(tracksIDs):
 
     response = []
-
     for id in tracksIDs:
         features = redis_cache.get(id)
         if features == None:
@@ -30,4 +29,4 @@ def getTracksFeaturesCache(tracksIDs):
         else:
             response.append(json.loads(features))
 
-    return response            
+    return pd.DataFrame(response)
