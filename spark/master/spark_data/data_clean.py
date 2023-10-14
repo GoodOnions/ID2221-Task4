@@ -3,11 +3,21 @@ from pyspark.sql import SparkSession
 from pyspark.sql.functions import explode, date_format
 from pyspark.sql import SparkSession
 import pandas as pd
-from pyspark.sql.functions import from_json, col, get_json_object, udf, pandas_udf
+from pyspark.sql.functions import from_json, col, get_json_object, udf, pandas_udf, coalesce
 from pyspark.sql.types import StructType, StructField, StringType, IntegerType, TimestampType, ArrayType, DoubleType
 import requests
 from spotifyAPI import getTracksFeaturesAPI
+import redisCache as rc
 
+import redis 
+REDIS_IP = 'redis'
+
+redis_cache= redis.Redis(
+    host='REDIS_IP',
+    port=6379,
+    charset="utf-8",
+    decode_responses=True
+    )
 
 # Define the schema, replace with what you expect
 response_schema = StructType([
@@ -22,6 +32,16 @@ item_schema = StructType([
     StructField("played_at", StringType(),True),
     StructField("context", StringType(),True)
 ])
+
+features_schema =StructType([
+                    StructField("energy", DoubleType(), True),
+                    StructField("danceability", DoubleType(), True),
+                    StructField("duration_ms", DoubleType(), True),
+                    StructField("instrumentalness", DoubleType(), True),
+                    StructField("loudness", DoubleType(), True),
+                    StructField("tempo", DoubleType(), True),
+                    StructField("valence", DoubleType(), True)
+                ])
 
 
 packages = [
@@ -55,6 +75,8 @@ json_df = df.select(explode(from_json(col("value").cast("string"), ArrayType(res
 
 json_df = json_df.select('*',explode(from_json(col("items").cast("string"), ArrayType(item_schema))).alias('item')).select('*','item.*')
 
+
+# Parsing kafka input
 json_df = json_df.select('user_id','played_at',\
                          get_json_object(col("track").cast("string"), "$.id").alias("track_id").cast('string'),\
                          get_json_object(col("track").cast("string"), "$.name").alias("track_name").cast('string'),\
@@ -66,22 +88,27 @@ json_df = json_df.withColumn("day_of_week", date_format(col("played_at"), "F"))
 json_df = json_df.withColumn("hour_of_day", date_format(col("played_at"), "H"))
 
 
+# Definition of udf functions
+get_track_features_cache  = pandas_udf(rc.getTracksFeaturesCache, returnType = features_schema)
+get_track_features_api = pandas_udf(getTracksFeaturesAPI, returnType = features_schema)
 
-get_track_info_udf = pandas_udf(getTracksFeaturesAPI, returnType = StructType([
-                                                            StructField("energy", DoubleType(), True),
-                                                            StructField("danceability", DoubleType(), True),
-                                                            StructField("duration_ms", DoubleType(), True),
-                                                            StructField("instrumentalness", DoubleType(), True),
-                                                            StructField("loudness", DoubleType(), True),
-                                                            StructField("tempo", DoubleType(), True),
-                                                            StructField("valence", DoubleType(), True)
-                                                            ]))
+#Get cached items
+inCacheIDs = json_df.filter(col('track_id').isin(list(rc.getKeys()))).select('track_id')
+inCacheTracksFeatures = inCacheIDs.withColumn("features", get_track_features_cache(json_df['track_id']))
+                                  
+
+#Call to API
+missedIDs = json_df.filter(col('track_id').isin(list(rc.getKeys()))==False).select('track_id')
+responseTracksFeatures = missedIDs.withColumn("features", get_track_features_cache(json_df['track_id']))
+
+#### ToDo: Add items to the cache
 
 
-json_df = json_df.withColumn("features", get_track_info_udf(json_df['track_id']))
+#Join item streams
+all_features = inCacheTracksFeatures.union(responseTracksFeatures)
 
-json_df = json_df.select('*','features.*').drop('features')
 
+json_df = json_df.join(all_features,'track_id').select('*','features.*').drop('features')
 
 query = json_df.selectExpr("CAST(user_id AS STRING)",\
                            "CAST(played_at AS STRING)",\
