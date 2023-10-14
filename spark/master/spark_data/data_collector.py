@@ -12,11 +12,46 @@ AUTH_URL = 'https://accounts.spotify.com/api/token'
 BASE_URL = 'https://api.spotify.com/v1/'
 REDIS_IP = 'redis'
 
+FEATURES = ['energy','danceability','duration_ms','instrumentalness','loudness','tempo','valence'] #E' fake
 
-redis_cache= redis.StrictRedis(host=REDIS_IP)
+
+################ REDIS ###################
+redis_cache= redis.Redis(
+    host= REDIS_IP,
+    port=6379,
+    charset="utf-8",
+    decode_responses=True
+    )
+
+def getKeys():
+    return redis_cache.keys()
+
+def isInCacheList(tracksIDs):
+
+    keys = set(getKeys())
+    resp=[]
+    for id in tracksIDs:
+        resp.append(id in keys)
+
+    return pd.DataFrame(resp)
+
+def getTracksFeaturesCache(tracksIDs):
+
+    response = []
+    for id in tracksIDs:
+        features = redis_cache.get(id)
+        if features == None:
+            response.append(())
+        else:
+            response.append(json.loads(features))
+
+    return pd.DataFrame(response)
 
 
-def getAccessToken():
+
+################ Spotify ###################
+
+def __getAccessToken():
 
     auth_response = requests.post(AUTH_URL, {
         'grant_type': 'client_credentials',
@@ -28,12 +63,12 @@ def getAccessToken():
     return auth_response_data['access_token']
 
 
-def getAuthHeader():
+def _getAuthHeader():
 
     header = redis_cache.get('header')
     if header == None:
         
-        access_token = getAccessToken()
+        access_token = __getAccessToken()
         header = {
             'Authorization': 'Bearer {token}'.format(token=access_token)
         }
@@ -49,7 +84,7 @@ def getTracksAudioFeatures(ids,features):
     if len(ids)==0:
         return {}
     
-    headers = getAuthHeader()
+    headers = _getAuthHeader()
     request_result = {}
 
     for n in range(int(len(ids)/100)+1):
@@ -75,7 +110,7 @@ def getTracksAudioFeatures(ids,features):
     return request_result
 
 
-def getTracksFeaturesAPI(track_ids, features=['energy','danceability','duration_ms','instrumentalness','loudness','tempo','valence']):
+def getTracksFeaturesAPI(track_ids, features=FEATURES):
     
     track_ids = list(track_ids)
 

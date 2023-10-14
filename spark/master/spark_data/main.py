@@ -1,23 +1,16 @@
-from time import sleep
-from pyspark.sql import SparkSession
+from pyspark.sql.types import StructType, StructField, StringType, IntegerType, TimestampType, ArrayType, DoubleType, BooleanType
+from pyspark.sql.functions import from_json, col, get_json_object, udf, pandas_udf, coalesce
 from pyspark.sql.functions import explode, date_format
 from pyspark.sql import SparkSession
-import pandas as pd
-from pyspark.sql.functions import from_json, col, get_json_object, udf, pandas_udf, coalesce
-from pyspark.sql.types import StructType, StructField, StringType, IntegerType, TimestampType, ArrayType, DoubleType, BooleanType
-import requests
-from spotifyAPI import getTracksFeaturesAPI
-import redisCache as rc
 
-import redis 
-REDIS_IP = 'redis'
 
-redis_cache= redis.Redis(
-    host='REDIS_IP',
-    port=6379,
-    charset="utf-8",
-    decode_responses=True
-    )
+import data_collector as dc
+
+CASSANDRA_IP = 'cassandra'
+CASSANDRA_USER = 'cassandra'
+CASSANDRA_PASSWORD = 'cassandra'
+KAFKA_BOOTSTRAP = "10.0.0.5:9094" 
+
 
 # Define the schema, replace with what you expect
 response_schema = StructType([
@@ -56,10 +49,10 @@ spark = SparkSession.builder\
    .master("spark://10.0.0.2:7077")\
    .appName("Demo")\
    .config("spark.jars.packages", ",".join(packages))\
-   .config("spark.cassandra.connection.host", "10.0.0.6")\
+   .config("spark.cassandra.connection.host", CASSANDRA_IP)\
    .config("spark.cassandra.connection.port", "9042")\
-   .config("spark.cassandra.auth.username","cassandra")\
-   .config("spark.cassandra.auth.password","cassandra")\
+   .config("spark.cassandra.auth.username",CASSANDRA_USER)\
+   .config("spark.cassandra.auth.password",CASSANDRA_PASSWORD)\
    .getOrCreate() 
 
 spark.sparkContext.setLogLevel("WARN")
@@ -67,19 +60,17 @@ spark.sparkContext.setLogLevel("WARN")
 df = spark\
         .readStream\
         .format("kafka")\
-        .option("kafka.bootstrap.servers", "10.0.0.5:9094")\
+        .option("kafka.bootstrap.servers", KAFKA_BOOTSTRAP)\
         .option("subscribe", "onions")\
         .option("startingOffsets", "earliest")\
         .load()
 
 
 
+###### Parsing kafka input ######
 json_df = df.select(explode(from_json(col("value").cast("string"), ArrayType(response_schema))).alias('json')).select('json.*')
-
 json_df = json_df.select('*',explode(from_json(col("items").cast("string"), ArrayType(item_schema))).alias('item')).select('*','item.*')
 
-
-# Parsing kafka input
 json_df = json_df.select('user_id','played_at',\
                          get_json_object(col("track").cast("string"), "$.id").alias("track_id").cast('string'),\
                          get_json_object(col("track").cast("string"), "$.name").alias("track_name").cast('string'),\
@@ -91,30 +82,33 @@ json_df = json_df.withColumn("day_of_week", date_format(col("played_at"), "F"))
 json_df = json_df.withColumn("hour_of_day", date_format(col("played_at"), "H"))
 
 
-# Definition of udf functions
-get_track_features_cache  = pandas_udf(rc.getTracksFeaturesCache, returnType = features_schema)
-get_track_in_cache  = pandas_udf(rc.isInCacheList, returnType = boolean_schema)
-get_track_features_api = pandas_udf(getTracksFeaturesAPI, returnType = features_schema)
 
-# Map items in cache
+###### Definition of udf functions ######
+get_track_features_cache  = pandas_udf(dc.getTracksFeaturesCache, returnType = features_schema)
+get_track_in_cache  = pandas_udf(dc.isInCacheList, returnType = boolean_schema)
+get_track_features_api = pandas_udf(dc.getTracksFeaturesAPI, returnType = features_schema)
+
+
+
+####### Map items in cache #######
 allIDs = json_df.select('track_id').withColumn('isInCache',get_track_in_cache(json_df['track_id'])).select('track_id', 'isInCache.*')
 
-#Get cached items
+
+
+####### Get cached items #########
 ids = allIDs.filter('isInCache == True').select('track_id')
 inCacheTracksFeatures = ids.withColumn("features", get_track_features_cache(ids['track_id']))
+
                                   
 
-#Call to API
+########## Call to API ###########
 ids = allIDs.filter('isInCache == False').select('track_id')
 responseTracksFeatures = ids.withColumn("features", get_track_features_api(ids['track_id']))
 
-#### ToDo: Add items to the cache
 
 
 #Join item streams
 all_features = inCacheTracksFeatures.union(responseTracksFeatures)
-
-
 json_df = json_df.join(all_features,'track_id').select('*','features.*').drop('features')
 
 query = json_df.selectExpr("CAST(user_id AS STRING)",\
@@ -136,18 +130,18 @@ query = json_df.selectExpr("CAST(user_id AS STRING)",\
 query.awaitTermination()
 
 
-# def writeToCassandra(writeDF, _):
-#   writeDF.write \
-#     .format("org.apache.spark.sql.cassandra")\
-#     .mode('append')\
-#     .options(table="music_play_history", keyspace="goodonions")\
-#     .save()
+def writeToCassandra(writeDF, _):
+  writeDF.write \
+    .format("org.apache.spark.sql.cassandra")\
+    .mode('append')\
+    .options(table="music_play_history", keyspace="goodonions")\
+    .save()
 
-# json_df.writeStream \
-#     .foreachBatch(writeToCassandra)\
-#     .outputMode("append")\
-#     .start()\
-#     .awaitTermination()
+json_df.writeStream \
+    .foreachBatch(writeToCassandra)\
+    .outputMode("append")\
+    .start()\
+    .awaitTermination()
 
 
 json_df.show()
