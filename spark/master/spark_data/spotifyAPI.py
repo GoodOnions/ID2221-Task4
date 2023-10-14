@@ -6,11 +6,11 @@ import pandas as pd
 
 CLIENT_ID = '72c2183e4c034c15a0305818667390b7'
 CLIENT_SECRET = '7dc6919a592f49519435f7dc3f8fc1b5'
-EXPIRING_TIME = 3500
+EXPIRING_TIME_AUTH = 3500
 
 AUTH_URL = 'https://accounts.spotify.com/api/token'
 BASE_URL = 'https://api.spotify.com/v1/'
-REDIS_IP = '10.0.0.7'
+REDIS_IP = 'redis'
 
 
 redis_cache= redis.StrictRedis(host=REDIS_IP)
@@ -37,7 +37,7 @@ def getAuthHeader():
         header = {
             'Authorization': 'Bearer {token}'.format(token=access_token)
         }
-        redis_cache.set('header',json.dumps(header),ex=EXPIRING_TIME)  #Spotify timeout at 3600
+        redis_cache.set('header',json.dumps(header),ex=EXPIRING_TIME_AUTH)  #Spotify timeout at 3600
     else:
         header = json.loads(header)
 
@@ -48,7 +48,7 @@ def getTracksAudioFeatures(ids,features):
 
     if len(ids)==0:
         return {}
-    print('dio porco',ids)
+    
     headers = getAuthHeader()
     request_result = {}
 
