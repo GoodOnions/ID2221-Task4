@@ -12,7 +12,7 @@ AUTH_URL = 'https://accounts.spotify.com/api/token'
 BASE_URL = 'https://api.spotify.com/v1/'
 REDIS_IP = 'redis'
 
-FEATURES = ['energy','danceability','duration_ms','instrumentalness','loudness','tempo','valence'] #E' fake
+FEATURES = ['energy','danceability','duration_ms','instrumentalness','loudness','tempo','valence'] #fake
 
 
 ################ REDIS ###################
@@ -112,27 +112,11 @@ def getTracksAudioFeatures(ids,features):
 
 def getTracksFeaturesAPI(track_ids, features=FEATURES):
     
-    track_ids = list(track_ids)
-
-    missing_ids = set()
-    hitted_ids = {}
-    
-    for id in track_ids:
-
-        track_info = redis_cache.get(id)
-        if track_info == None:
-            missing_ids.add(id)
-        else:
-            hitted_ids[id]=json.loads(track_info)
-
-    request_result = getTracksAudioFeatures(list(missing_ids),features) 
+    ids = set(track_ids)    
+    request_result = getTracksAudioFeatures(list(ids),features) 
 
     result = []
     for id in track_ids:
-
-        if id in missing_ids:
-            result.append(request_result.get(id,()))
-        else:
-            result.append(hitted_ids.get(id,()))
+        result.append(request_result.get(id,()))
         
     return pd.DataFrame(result)

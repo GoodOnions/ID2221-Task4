@@ -1,5 +1,5 @@
 from pyspark.sql.types import StructType, StructField, StringType, IntegerType, TimestampType, ArrayType, DoubleType, BooleanType
-from pyspark.sql.functions import from_json, col, get_json_object, udf, pandas_udf, coalesce
+from pyspark.sql.functions import from_json, col, get_json_object, pandas_udf
 from pyspark.sql.functions import explode, date_format
 from pyspark.sql import SparkSession
 
@@ -78,8 +78,8 @@ json_df = json_df.select('user_id','played_at',\
                          get_json_object(col("context").cast("string"), "$.type").alias("context_type").cast('string'),\
                          get_json_object(col("context").cast("string"), "$.href").alias("context_href").cast('string'),)
 
-json_df = json_df.withColumn("day_of_week", date_format(col("played_at"), "F"))
-json_df = json_df.withColumn("hour_of_day", date_format(col("played_at"), "H"))
+json_df = json_df.withColumn("day_of_week", date_format(col("played_at"), "F"))\
+                 .withColumn("hour_of_day", date_format(col("played_at"), "H"))
 
 
 
@@ -108,8 +108,8 @@ responseTracksFeatures = ids.withColumn("features", get_track_features_api(ids['
 
 
 #Join item streams
-all_features = inCacheTracksFeatures.union(responseTracksFeatures)
-json_df = json_df.join(all_features,'track_id').select('*','features.*').drop('features')
+all_features = inCacheTracksFeatures.union(responseTracksFeatures).select('track_id','features.*')
+json_df = json_df.join(all_features,'track_id')
 
 query = json_df.selectExpr("CAST(user_id AS STRING)",\
                            "CAST(played_at AS STRING)",\
