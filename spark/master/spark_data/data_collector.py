@@ -6,17 +6,52 @@ import pandas as pd
 
 CLIENT_ID = '72c2183e4c034c15a0305818667390b7'
 CLIENT_SECRET = '7dc6919a592f49519435f7dc3f8fc1b5'
-EXPIRING_TIME = 3500
+EXPIRING_TIME_AUTH = 3500
 
 AUTH_URL = 'https://accounts.spotify.com/api/token'
 BASE_URL = 'https://api.spotify.com/v1/'
-REDIS_IP = '10.0.0.7'
+REDIS_IP = 'redis'
+
+FEATURES = ['energy','danceability','duration_ms','instrumentalness','loudness','tempo','valence'] #fake
 
 
-redis_cache= redis.StrictRedis(host=REDIS_IP)
+################ REDIS ###################
+redis_cache= redis.Redis(
+    host= REDIS_IP,
+    port=6379,
+    charset="utf-8",
+    decode_responses=True
+    )
+
+def getKeys():
+    return redis_cache.keys()
+
+def isInCacheList(tracksIDs):
+
+    keys = set(getKeys())
+    resp=[]
+    for id in tracksIDs:
+        resp.append(id in keys)
+
+    return pd.DataFrame(resp)
+
+def getTracksFeaturesCache(tracksIDs):
+
+    response = []
+    for id in tracksIDs:
+        features = redis_cache.get(id)
+        if features == None:
+            response.append(())
+        else:
+            response.append(json.loads(features))
+
+    return pd.DataFrame(response)
 
 
-def getAccessToken():
+
+################ Spotify ###################
+
+def __getAccessToken():
 
     auth_response = requests.post(AUTH_URL, {
         'grant_type': 'client_credentials',
@@ -28,16 +63,16 @@ def getAccessToken():
     return auth_response_data['access_token']
 
 
-def getAuthHeader():
+def _getAuthHeader():
 
     header = redis_cache.get('header')
     if header == None:
         
-        access_token = getAccessToken()
+        access_token = __getAccessToken()
         header = {
             'Authorization': 'Bearer {token}'.format(token=access_token)
         }
-        redis_cache.set('header',json.dumps(header),ex=EXPIRING_TIME)  #Spotify timeout at 3600
+        redis_cache.set('header',json.dumps(header),ex=EXPIRING_TIME_AUTH)  #Spotify timeout at 3600
     else:
         header = json.loads(header)
 
@@ -48,8 +83,8 @@ def getTracksAudioFeatures(ids,features):
 
     if len(ids)==0:
         return {}
-    print('dio porco',ids)
-    headers = getAuthHeader()
+    
+    headers = _getAuthHeader()
     request_result = {}
 
     for n in range(int(len(ids)/100)+1):
@@ -75,29 +110,13 @@ def getTracksAudioFeatures(ids,features):
     return request_result
 
 
-def getTracksFeaturesAPI(track_ids, features=['energy','danceability','duration_ms','instrumentalness','loudness','tempo','valence']):
+def getTracksFeaturesAPI(track_ids, features=FEATURES):
     
-    track_ids = list(track_ids)
-
-    missing_ids = set()
-    hitted_ids = {}
-    
-    for id in track_ids:
-
-        track_info = redis_cache.get(id)
-        if track_info == None:
-            missing_ids.add(id)
-        else:
-            hitted_ids[id]=json.loads(track_info)
-
-    request_result = getTracksAudioFeatures(list(missing_ids),features) 
+    ids = set(track_ids)    
+    request_result = getTracksAudioFeatures(list(ids),features) 
 
     result = []
     for id in track_ids:
-
-        if id in missing_ids:
-            result.append(request_result.get(id,()))
-        else:
-            result.append(hitted_ids.get(id,()))
+        result.append(request_result.get(id,()))
         
     return pd.DataFrame(result)
