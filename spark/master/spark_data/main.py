@@ -1,12 +1,15 @@
-from time import sleep
-from pyspark.sql import SparkSession
+from pyspark.sql.types import StructType, StructField, StringType, IntegerType, TimestampType, ArrayType, DoubleType, BooleanType
+from pyspark.sql.functions import from_json, col, get_json_object, pandas_udf
 from pyspark.sql.functions import explode, date_format
 from pyspark.sql import SparkSession
-import pandas as pd
-from pyspark.sql.functions import from_json, col, get_json_object, udf, pandas_udf
-from pyspark.sql.types import StructType, StructField, StringType, IntegerType, TimestampType, ArrayType, DoubleType
-import requests
-from spotifyAPI import getTracksFeaturesAPI
+
+
+import data_collector as dc
+
+CASSANDRA_IP = 'cassandra'
+CASSANDRA_USER = 'cassandra'
+CASSANDRA_PASSWORD = 'cassandra'
+KAFKA_BOOTSTRAP = "10.0.0.5:9094" 
 
 
 # Define the schema, replace with what you expect
@@ -23,6 +26,19 @@ item_schema = StructType([
     StructField("context", StringType(),True)
 ])
 
+features_schema =StructType([
+                    StructField("energy", DoubleType(), True),
+                    StructField("danceability", DoubleType(), True),
+                    StructField("duration_ms", DoubleType(), True),
+                    StructField("instrumentalness", DoubleType(), True),
+                    StructField("loudness", DoubleType(), True),
+                    StructField("tempo", DoubleType(), True),
+                    StructField("valence", DoubleType(), True)
+                ])
+
+boolean_schema=StructType([
+                    StructField("isInCache", BooleanType(), True)
+                ])
 
 packages = [
     'org.apache.spark:spark-sql-kafka-0-10_2.12:3.1.2',
@@ -33,10 +49,10 @@ spark = SparkSession.builder\
    .master("spark://10.0.0.2:7077")\
    .appName("Demo")\
    .config("spark.jars.packages", ",".join(packages))\
-   .config("spark.cassandra.connection.host", "10.0.0.6")\
+   .config("spark.cassandra.connection.host", CASSANDRA_IP)\
    .config("spark.cassandra.connection.port", "9042")\
-   .config("spark.cassandra.auth.username","cassandra")\
-   .config("spark.cassandra.auth.password","cassandra")\
+   .config("spark.cassandra.auth.username",CASSANDRA_USER)\
+   .config("spark.cassandra.auth.password",CASSANDRA_PASSWORD)\
    .getOrCreate() 
 
 spark.sparkContext.setLogLevel("WARN")
@@ -44,15 +60,15 @@ spark.sparkContext.setLogLevel("WARN")
 df = spark\
         .readStream\
         .format("kafka")\
-        .option("kafka.bootstrap.servers", "10.0.0.5:9094")\
+        .option("kafka.bootstrap.servers", KAFKA_BOOTSTRAP)\
         .option("subscribe", "onions")\
         .option("startingOffsets", "earliest")\
         .load()
 
 
 
+###### Parsing kafka input ######
 json_df = df.select(explode(from_json(col("value").cast("string"), ArrayType(response_schema))).alias('json')).select('json.*')
-
 json_df = json_df.select('*',explode(from_json(col("items").cast("string"), ArrayType(item_schema))).alias('item')).select('*','item.*')
 
 json_df = json_df.select('user_id','played_at',\
@@ -62,26 +78,38 @@ json_df = json_df.select('user_id','played_at',\
                          get_json_object(col("context").cast("string"), "$.type").alias("context_type").cast('string'),\
                          get_json_object(col("context").cast("string"), "$.href").alias("context_href").cast('string'),)
 
-json_df = json_df.withColumn("day_of_week", date_format(col("played_at"), "F"))
-json_df = json_df.withColumn("hour_of_day", date_format(col("played_at"), "H"))
+json_df = json_df.withColumn("day_of_week", date_format(col("played_at"), "F"))\
+                 .withColumn("hour_of_day", date_format(col("played_at"), "H"))
 
 
 
-get_track_info_udf = pandas_udf(getTracksFeaturesAPI, returnType = StructType([
-                                                            StructField("energy", DoubleType(), True),
-                                                            StructField("danceability", DoubleType(), True),
-                                                            StructField("duration_ms", DoubleType(), True),
-                                                            StructField("instrumentalness", DoubleType(), True),
-                                                            StructField("loudness", DoubleType(), True),
-                                                            StructField("tempo", DoubleType(), True),
-                                                            StructField("valence", DoubleType(), True)
-                                                            ]))
+###### Definition of udf functions ######
+get_track_features_cache  = pandas_udf(dc.getTracksFeaturesCache, returnType = features_schema)
+get_track_in_cache  = pandas_udf(dc.isInCacheList, returnType = boolean_schema)
+get_track_features_api = pandas_udf(dc.getTracksFeaturesAPI, returnType = features_schema)
 
 
-json_df = json_df.withColumn("features", get_track_info_udf(json_df['track_id']))
 
-json_df = json_df.select('*','features.*').drop('features')
+####### Map items in cache #######
+allIDs = json_df.select('track_id').withColumn('isInCache',get_track_in_cache(json_df['track_id'])).select('track_id', 'isInCache.*')
 
+
+
+####### Get cached items #########
+ids = allIDs.filter('isInCache == True').select('track_id')
+inCacheTracksFeatures = ids.withColumn("features", get_track_features_cache(ids['track_id']))
+
+                                  
+
+########## Call to API ###########
+ids = allIDs.filter('isInCache == False').select('track_id')
+responseTracksFeatures = ids.withColumn("features", get_track_features_api(ids['track_id']))
+
+
+
+#Join item streams
+all_features = inCacheTracksFeatures.union(responseTracksFeatures).select('track_id','features.*')
+json_df = json_df.join(all_features,'track_id')
 
 query = json_df.selectExpr("CAST(user_id AS STRING)",\
                            "CAST(played_at AS STRING)",\
@@ -99,7 +127,7 @@ query = json_df.selectExpr("CAST(user_id AS STRING)",\
     .writeStream \
     .format("console") \
     .start()
-# query.awaitTermination()
+query.awaitTermination()
 
 
 def writeToCassandra(writeDF, _):
@@ -110,8 +138,8 @@ def writeToCassandra(writeDF, _):
     .save()
 
 json_df.writeStream \
-    .foreachBatch(writeToCassandra) \
-    .outputMode("update") \
+    .foreachBatch(writeToCassandra)\
+    .outputMode("append")\
     .start()\
     .awaitTermination()
 
