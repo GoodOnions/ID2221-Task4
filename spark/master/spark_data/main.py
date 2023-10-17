@@ -62,7 +62,6 @@ df = spark\
         .format("kafka")\
         .option("kafka.bootstrap.servers", KAFKA_BOOTSTRAP)\
         .option("subscribe", "onions")\
-        .option("startingOffsets", "earliest")\
         .load()
 
 
