@@ -1,5 +1,5 @@
 echo "-------- KAFKA SETUP: --------"
-docker-compose exec kafka kafka-topics.sh --create --if-not-exists --topic onions --partitions 1 --replication-factor 1 --bootstrap-server kafka:9093
+docker-compose exec kafka kafka-topics.sh --create --if-not-exists --topic onions --partitions 1 --replication-factor 1 --bootstrap-server kafka:9094
 echo "Kafka setup completed!" 
 
 echo "Installation of dependencies spark worker: "
