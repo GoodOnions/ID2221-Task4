@@ -127,7 +127,7 @@ query = json_df.selectExpr("CAST(user_id AS STRING)",\
     .writeStream \
     .format("console") \
     .start()
-query.awaitTermination()
+
 
 
 def writeToCassandra(writeDF, _):
