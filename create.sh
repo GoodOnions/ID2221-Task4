@@ -18,3 +18,4 @@ docker exec spotify-connector-backend-1 php artisan key:generate
 docker exec spotify-connector-backend-1 php artisan migrate
 docker exec spotify-connector-backend-1 npm install
 docker exec spotify-connector-backend-1 npm run build
+docker exec spotify-connector-backend-1 pip3 install -r requirements.txt
