@@ -14,6 +14,16 @@ You can request your token [here](https://developer.spotify.com/)
 
 # Setup ENV
 Add the environment variables to the `.env` file, you can find a template in `.env.example`
+```
+###### Spotify variables ######
+SPOTIFY_CLIENT_ID=''
+SPOTIFY_CLIENT_SECRET=''
+SPOTIFY_REDIRECT_URI='http://localhost/auth/spotify/callback'
+
+###### Cassandra variables ######
+CASSANDRA_USER='cassandra'
+CASSANDRA_PASSWORD='cassandra'
+```
 
 # Prebuild docker image
 ```
