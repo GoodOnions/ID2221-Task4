@@ -1,0 +1,1 @@
+docker exec spotify-connector-backend-1 php artisan data:generate
