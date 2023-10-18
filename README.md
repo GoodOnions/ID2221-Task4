@@ -26,6 +26,7 @@ CASSANDRA_PASSWORD='cassandra'
 ```
 
 # Prebuild docker image
+Keep in mind that it will take more than three minutes
 ```
 bash build.sh
 ```
