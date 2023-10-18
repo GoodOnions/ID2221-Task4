@@ -38,3 +38,6 @@ bash setup.sh
 ```
 bash start.sh
 ```
+
+## View web application
+To view the web application open the browser to [http://localhost](http://localhost)
