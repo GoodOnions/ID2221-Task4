@@ -1,25 +1,19 @@
-# ID2221-Task4
- Distributed Music Genre Preferences Tracker with Spotify API
+# ID2221-Task4 Data Intensive Computing Project
+ In this project, we aimed to create a web application capable of providing analytics and statistics on music streaming via Spotify. The project is composed of a back-end and a front-end element that allows users to link their Spotify account and view their listening statistics. The back-end consists of a distributed system designed to process and store all the relevant information. 
+
+## System structure
+![System structure](/images/system_structure.png)
 
 
-## Start CassandraCluster
+# Startup
+
+Please note that Cassandra may take a while to start up, so wait a few seconds between commands
 ```
- docker compose -f CassandraCluster/compose.yml up -d
+docker compose -f compose.local.yaml up -d
+bash setup.sh
 ```
 
-## To run script
+# Start
 ```
-docker-compose exec spark_master spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.1.2 /bitnami/data_clean.py
-```
-
-## To run new script + cassandra 
-```
-docker-compose exec spark_master spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.1.2,com.datastax.spark:spark-cassandra-connector_2.12:3.0.0 /bitnami/data_clean.py
-```
-
-# Startup Steps
-
-## Create kafka topic
-```
-docker-compose exec kafka bin/kafka-topics.sh --create --topic quickstart-events
+bash start.sh
 ```
