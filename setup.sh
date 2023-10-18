@@ -5,7 +5,7 @@ echo "Kafka setup completed!"
 echo "Installation of dependencies spark worker: "
 docker exec spark_master pip install pandas requests PyArrow redis
 docker exec spark_worker pip install pandas requests PyArrow redis
-echo "Installation complited!"
+echo "Installation completed!"
 
 
 #echo "Enter cassandra DB password: " 

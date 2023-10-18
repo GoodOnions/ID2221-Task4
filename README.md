@@ -4,16 +4,37 @@
 ## System structure
 ![System structure](/images/system_structure.png)
 
+# Docker
+Our project requires `docker` and `docker-compose`
 
-# Startup
+# Spotify API access
+This project is using the Spotify API so you will need a Spotify API Client ID and Token. 
+You can request your token [here](https://developer.spotify.com/)
 
+
+# Setup ENV
+Add the environment variables to the `.env` file, you can find a template in `.env.example`
+
+# Prebuild docker image
+```
+bash build.sh
+```
+
+# Running the application
+
+## Create docker container
+To create your docker containers for both backend and distributed spark processing run the following code
+```
+bash create.sh
+```
+
+## Additional setup required
 Please note that Cassandra may take a while to start up, so wait a few seconds between commands
 ```
-docker compose -f compose.local.yaml up -d
 bash setup.sh
 ```
 
-# Start
+## Start
 ```
 bash start.sh
 ```
