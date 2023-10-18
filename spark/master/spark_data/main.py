@@ -2,13 +2,13 @@ from pyspark.sql.types import StructType, StructField, StringType, IntegerType, 
 from pyspark.sql.functions import from_json, col, get_json_object, pandas_udf
 from pyspark.sql.functions import explode, date_format
 from pyspark.sql import SparkSession
-
+import os 
 
 import data_collector as dc
 
 CASSANDRA_IP = 'cassandra'
-CASSANDRA_USER = 'cassandra'
-CASSANDRA_PASSWORD = 'cassandra'
+cassandra_user = os.getenv('CASSANDRA_USER')
+cassandra_password = os.getenv('CASSANDRA_PASSWORD')
 KAFKA_BOOTSTRAP = "10.0.0.5:9094" 
 
 
@@ -51,8 +51,8 @@ spark = SparkSession.builder\
    .config("spark.jars.packages", ",".join(packages))\
    .config("spark.cassandra.connection.host", CASSANDRA_IP)\
    .config("spark.cassandra.connection.port", "9042")\
-   .config("spark.cassandra.auth.username",CASSANDRA_USER)\
-   .config("spark.cassandra.auth.password",CASSANDRA_PASSWORD)\
+   .config("spark.cassandra.auth.username",cassandra_user)\
+   .config("spark.cassandra.auth.password",cassandra_password)\
    .getOrCreate() 
 
 spark.sparkContext.setLogLevel("WARN")

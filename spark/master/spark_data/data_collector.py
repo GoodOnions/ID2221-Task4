@@ -1,11 +1,12 @@
 from time import sleep
+import pandas as pd
 import requests
 import redis 
 import json
-import pandas as pd
+import os
 
-CLIENT_ID = '72c2183e4c034c15a0305818667390b7'
-CLIENT_SECRET = '7dc6919a592f49519435f7dc3f8fc1b5'
+client_id = os.getenv('SPOTIFY_CLIENT_ID')
+client_secret = os.getenv('SPOTIFY_CLIENT_SECRET')
 EXPIRING_TIME_AUTH = 3500
 
 AUTH_URL = 'https://accounts.spotify.com/api/token'
@@ -55,8 +56,8 @@ def __getAccessToken():
 
     auth_response = requests.post(AUTH_URL, {
         'grant_type': 'client_credentials',
-        'client_id': CLIENT_ID,
-        'client_secret': CLIENT_SECRET,
+        'client_id': client_id,
+        'client_secret': client_secret,
     })
     
     auth_response_data = auth_response.json()

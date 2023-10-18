@@ -28,6 +28,8 @@ services:
       - '8080:8080'
     volumes:
       - './spark/master/spark_data:/bitnami'
+    env_file:
+      - .env
     networks:
       goodonions:
         ipv4_address: 10.0.0.2
@@ -52,6 +54,8 @@ services:
       - '8081:8081'
     depends_on:
       - spark_master
+    env_file:
+      - .env
     networks:
       goodonions:
         ipv4_address: 10.0.0.3
