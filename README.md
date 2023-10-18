@@ -40,4 +40,9 @@ bash start.sh
 ```
 
 ## View web application
-To view the web application open the browser to [http://localhost](http://localhost)
+To view the web application open the browser to [http://localhost](http://localhost) and register your account
+
+## Generate fake data
+```
+bash generate-data.sh
+```
