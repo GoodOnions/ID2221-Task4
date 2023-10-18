@@ -1,0 +1,3 @@
+[submodule "spotify-connector"]
+	path = spotify-connector
+	url = https://github.com/GoodOnions/spotify-connector
